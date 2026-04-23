@@ -1,0 +1,54 @@
+name: nfc_carte
+description: "Carte de visite numerique NFC customisable, partage QR/NFC/vCard, 100% local, RGPD."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Routing
+  go_router: ^14.2.0
+
+  # Local storage (encryption on iOS Keychain / Android Keystore)
+  hive_ce: ^2.9.0
+  hive_ce_flutter: ^2.0.0
+  flutter_secure_storage: ^9.2.2
+  path_provider: ^2.1.4
+
+  # NFC
+  nfc_manager: ^3.5.0
+
+  # QR / sharing
+  qr_flutter: ^4.1.0
+  share_plus: ^10.0.2
+  url_launcher: ^6.3.0
+
+  # Utils
+  uuid: ^4.4.2
+  image_picker: ^1.1.2
+  flutter_colorpicker: ^1.1.0
+  package_info_plus: ^8.0.2
+  permission_handler: ^11.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true
+  assets:
+    - assets/icon/
+    - assets/images/
