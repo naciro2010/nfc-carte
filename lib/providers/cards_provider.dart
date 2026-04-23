@@ -33,6 +33,33 @@ class CardsNotifier extends StateNotifier<List<BusinessCard>> {
     _load();
   }
 
+  /// Imports a card (e.g., from a deep link or an NFC scan). The original id
+  /// is discarded to avoid collisions with the user's own cards.
+  Future<BusinessCard> import(BusinessCard incoming) async {
+    final imported = BusinessCard(
+      id: _uuid.v4(),
+      cardName: incoming.cardName.isEmpty
+          ? (incoming.fullName.isEmpty ? 'Importee' : incoming.fullName)
+          : incoming.cardName,
+      fullName: incoming.fullName,
+      jobTitle: incoming.jobTitle,
+      company: incoming.company,
+      email: incoming.email,
+      phone: incoming.phone,
+      website: incoming.website,
+      address: incoming.address,
+      linkedin: incoming.linkedin,
+      twitter: incoming.twitter,
+      instagram: incoming.instagram,
+      notes: incoming.notes,
+      primaryColor: incoming.primaryColor,
+      templateId: incoming.templateId,
+    );
+    await StorageService.instance.cardsBox.put(imported.id, imported);
+    _load();
+    return imported;
+  }
+
   BusinessCard? byId(String id) =>
       StorageService.instance.cardsBox.get(id);
 }

@@ -1,0 +1,103 @@
+name: Release — iOS (TestFlight + App Store)
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: "Fastlane lane to run"
+        required: true
+        default: "beta"
+        type: choice
+        options: [beta, release]
+
+env:
+  FLUTTER_VERSION: "3.24.3"
+
+concurrency:
+  group: release-ios
+  cancel-in-progress: false
+
+jobs:
+  ship:
+    # The CI workflow must pass on this ref before we deploy.
+    name: Ship to App Store Connect
+    runs-on: macos-14
+    timeout-minutes: 60
+    environment:
+      name: ios-production
+      url: https://appstoreconnect.apple.com
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Wait for CI to pass on this commit
+        if: github.event_name == 'push'
+        uses: fountainhead/action-wait-for-check@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: "Analyze & unit tests"
+          ref: ${{ github.sha }}
+          timeoutSeconds: 1800
+          intervalSeconds: 20
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+          architecture: x64
+
+      - name: Bootstrap platform folders
+        run: |
+          flutter create . --project-name nfc_carte --org ${{ secrets.IOS_BUNDLE_ORG }} --platforms ios,android
+          cp platform_config/ios/Runner/Info.plist            ios/Runner/Info.plist
+          cp platform_config/ios/Runner/Runner.entitlements   ios/Runner/Runner.entitlements
+          cp platform_config/ios/Runner/PrivacyInfo.xcprivacy ios/Runner/PrivacyInfo.xcprivacy
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Run Fastlane lane
+        working-directory: fastlane/ios
+        env:
+          CI: "true"
+          FLUTTER_BIN: flutter
+          IOS_BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ITC_TEAM_ID: ${{ secrets.APPLE_ITC_TEAM_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_KEY_CONTENT }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTH: ${{ secrets.MATCH_GIT_BASIC_AUTH }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
+          FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD }}
+          TESTFLIGHT_CHANGELOG: "Version ${{ github.ref_name }}"
+        run: |
+          LANE="${{ github.event.inputs.lane }}"
+          if [ -z "$LANE" ]; then LANE="beta"; fi
+          bundle exec fastlane ios "$LANE"
+
+      - name: Upload IPA artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: build/ios/ipa/*.ipa
+          if-no-files-found: ignore
+          retention-days: 30

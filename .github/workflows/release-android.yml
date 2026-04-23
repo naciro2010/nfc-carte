@@ -1,0 +1,133 @@
+name: Release — Android (Play Store)
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: "Fastlane lane to run"
+        required: true
+        default: "internal"
+        type: choice
+        options: [internal, beta, production]
+
+env:
+  FLUTTER_VERSION: "3.24.3"
+
+concurrency:
+  group: release-android
+  cancel-in-progress: false
+
+jobs:
+  ship:
+    name: Ship to Play Console
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment:
+      name: android-production
+      url: https://play.google.com/console
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Wait for CI to pass on this commit
+        if: github.event_name == 'push'
+        uses: fountainhead/action-wait-for-check@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: "Analyze & unit tests"
+          ref: ${{ github.sha }}
+          timeoutSeconds: 1800
+          intervalSeconds: 20
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Bootstrap platform folders
+        run: |
+          flutter create . --project-name nfc_carte --org ${{ secrets.IOS_BUNDLE_ORG }} --platforms ios,android
+          cp platform_config/android/app/src/main/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          mkdir -p android/app/src/main/res/xml
+          cp platform_config/android/app/src/main/res/xml/data_extraction_rules.xml android/app/src/main/res/xml/
+
+      - name: Decode upload keystore
+        run: |
+          echo "${{ secrets.UPLOAD_KEYSTORE_BASE64 }}" | base64 -d > android/app/nfc_carte_upload.jks
+
+      - name: Write key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.UPLOAD_STORE_PASSWORD }}
+          keyPassword=${{ secrets.UPLOAD_KEY_PASSWORD }}
+          keyAlias=${{ secrets.UPLOAD_KEY_ALIAS }}
+          storeFile=nfc_carte_upload.jks
+          EOF
+
+      - name: Wire signingConfigs into android/app/build.gradle
+        run: |
+          python3 - <<'PY'
+          import re, pathlib
+          p = pathlib.Path("android/app/build.gradle")
+          src = p.read_text()
+
+          signing_cfg = r"""
+              signingConfigs {
+                  release {
+                      def keyProps = new Properties()
+                      def keyFile = rootProject.file('key.properties')
+                      if (keyFile.exists()) {
+                          keyProps.load(new FileInputStream(keyFile))
+                          storeFile file(keyProps['storeFile'])
+                          storePassword keyProps['storePassword']
+                          keyAlias keyProps['keyAlias']
+                          keyPassword keyProps['keyPassword']
+                      }
+                  }
+              }
+          """
+          if "signingConfigs" not in src:
+              src = re.sub(r"(android \{)", r"\1" + signing_cfg, src, count=1)
+          src = src.replace("signingConfig signingConfigs.debug",
+                            "signingConfig signingConfigs.release")
+          p.write_text(src)
+          PY
+
+      - name: Install deps
+        run: flutter pub get
+
+      - name: Run Fastlane lane
+        working-directory: fastlane/android
+        env:
+          CI: "true"
+          FLUTTER_BIN: flutter
+          ANDROID_PACKAGE_NAME: ${{ secrets.ANDROID_PACKAGE_NAME }}
+          PLAY_STORE_CONFIG_JSON: ${{ secrets.PLAY_STORE_CONFIG_JSON }}
+        run: |
+          LANE="${{ github.event.inputs.lane }}"
+          if [ -z "$LANE" ]; then LANE="internal"; fi
+          bundle exec fastlane android "$LANE"
+
+      - name: Upload AAB artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab
+          path: build/app/outputs/bundle/release/*.aab
+          if-no-files-found: ignore
+          retention-days: 30

@@ -1,0 +1,13 @@
+# Default owners for everything.
+*                                           @naciro2010
+
+# Privacy-critical paths need explicit review.
+/lib/screens/privacy_screen.dart           @naciro2010
+/lib/services/consent_service.dart         @naciro2010
+/lib/services/storage_service.dart         @naciro2010
+/platform_config/ios/Runner/PrivacyInfo.xcprivacy @naciro2010
+
+# Release pipeline: any change must be reviewed.
+/.github/workflows/                        @naciro2010
+/fastlane/                                 @naciro2010
+/DEPLOY.md                                 @naciro2010

@@ -17,8 +17,9 @@ dependencies:
   # State management
   flutter_riverpod: ^2.5.1
 
-  # Routing
+  # Routing + deep links
   go_router: ^14.2.0
+  app_links: ^6.3.2
 
   # Local storage (encryption on iOS Keychain / Android Keystore)
   hive_ce: ^2.9.0
@@ -44,7 +45,12 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
   flutter_lints: ^4.0.0
+  mocktail: ^1.0.4
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.1
 
 flutter:
   uses-material-design: true
@@ -52,3 +58,22 @@ flutter:
   assets:
     - assets/icon/
     - assets/images/
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#1F6FEB"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+
+flutter_native_splash:
+  color: "#1F6FEB"
+  image: "assets/icon/splash.png"
+  color_dark: "#0B1220"
+  image_dark: "assets/icon/splash.png"
+  android_12:
+    icon_background_color: "#1F6FEB"
+    image: "assets/icon/splash.png"
+    color_dark: "#0B1220"

@@ -1,0 +1,76 @@
+# Fastfile — Android deployment for NFC Carte
+#
+# Lanes:
+#   - internal  : uploads to the Play Store internal track
+#   - beta      : promotes the latest internal build to the closed "beta" track
+#   - production: promotes the current beta to production (staged rollout 20%)
+#
+# Signing uses an upload keystore (nfc_carte_upload.jks) decrypted from the
+# UPLOAD_KEYSTORE_BASE64 secret. The Play Console is accessed via a service
+# account JSON (PLAY_STORE_CONFIG_JSON).
+
+default_platform(:android)
+
+FLUTTER_BIN = ENV["FLUTTER_BIN"] || "flutter"
+AAB_PATH    = "../build/app/outputs/bundle/release/app-release.aab"
+PACKAGE     = ENV["ANDROID_PACKAGE_NAME"] || "com.votredomaine.nfc_carte"
+
+platform :android do
+  desc "Build a signed AAB"
+  lane :build do
+    build_num = sh("git rev-list --count HEAD").strip.to_i
+    sh("#{FLUTTER_BIN} pub get")
+    sh(
+      "#{FLUTTER_BIN} build appbundle --release " \
+      "--build-number=#{build_num}"
+    )
+  end
+
+  desc "Upload to Play Store internal track"
+  lane :internal do
+    build
+    upload_to_play_store(
+      package_name: PACKAGE,
+      track: "internal",
+      aab: AAB_PATH,
+      release_status: "draft",
+      json_key_data: ENV["PLAY_STORE_CONFIG_JSON"],
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: false,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+
+  desc "Promote latest internal build to beta"
+  lane :beta do
+    upload_to_play_store(
+      package_name: PACKAGE,
+      track: "internal",
+      track_promote_to: "beta",
+      json_key_data: ENV["PLAY_STORE_CONFIG_JSON"],
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+
+  desc "Promote current beta to production (staged 20% rollout)"
+  lane :production do
+    upload_to_play_store(
+      package_name: PACKAGE,
+      track: "beta",
+      track_promote_to: "production",
+      rollout: "0.2",
+      json_key_data: ENV["PLAY_STORE_CONFIG_JSON"],
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+end

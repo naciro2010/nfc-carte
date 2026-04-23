@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  FLUTTER_VERSION: "3.24.3"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze-and-test:
+    name: Analyze & unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Bootstrap platform folders
+        run: flutter create . --project-name nfc_carte --org com.votredomaine --platforms ios,android
+      - name: Apply project platform configs
+        run: |
+          cp platform_config/ios/Runner/Info.plist            ios/Runner/Info.plist
+          cp platform_config/ios/Runner/Runner.entitlements   ios/Runner/Runner.entitlements
+          cp platform_config/ios/Runner/PrivacyInfo.xcprivacy ios/Runner/PrivacyInfo.xcprivacy
+          cp platform_config/android/app/src/main/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          mkdir -p android/app/src/main/res/xml
+          cp platform_config/android/app/src/main/res/xml/data_extraction_rules.xml android/app/src/main/res/xml/
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: dart format --set-exit-if-changed lib test integration_test
+
+      - name: Static analysis
+        run: flutter analyze --fatal-infos
+
+      - name: Run unit + widget tests with coverage
+        run: flutter test --coverage --reporter expanded
+
+      - name: Enforce minimum coverage
+        run: |
+          lines_found=$(grep -c '^DA:' coverage/lcov.info || true)
+          lines_hit=$(grep '^DA:' coverage/lcov.info | awk -F',' '$2 > 0' | wc -l || true)
+          echo "Lines hit: ${lines_hit}/${lines_found}"
+          if [ "${lines_found}" -eq 0 ]; then
+            echo "No coverage produced" >&2
+            exit 1
+          fi
+          ratio=$(awk "BEGIN{printf \"%.2f\", (${lines_hit}/${lines_found})*100}")
+          echo "Coverage: ${ratio}%"
+          threshold=${COVERAGE_THRESHOLD:-60}
+          awk "BEGIN{exit !(${ratio} >= ${threshold})}" || {
+            echo "Coverage ${ratio}% is below threshold ${threshold}%" >&2
+            exit 1
+          }
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          retention-days: 14
+
+  build-android:
+    name: Build Android (debug)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: analyze-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Bootstrap + apply configs
+        run: |
+          flutter create . --project-name nfc_carte --org com.votredomaine --platforms ios,android
+          cp platform_config/android/app/src/main/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          mkdir -p android/app/src/main/res/xml
+          cp platform_config/android/app/src/main/res/xml/data_extraction_rules.xml android/app/src/main/res/xml/
+
+      - run: flutter pub get
+      - run: flutter build apk --debug
+
+  build-ios:
+    name: Build iOS (no codesign)
+    runs-on: macos-14
+    timeout-minutes: 40
+    needs: analyze-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+          architecture: x64
+
+      - name: Bootstrap + apply configs
+        run: |
+          flutter create . --project-name nfc_carte --org com.votredomaine --platforms ios,android
+          cp platform_config/ios/Runner/Info.plist            ios/Runner/Info.plist
+          cp platform_config/ios/Runner/Runner.entitlements   ios/Runner/Runner.entitlements
+          cp platform_config/ios/Runner/PrivacyInfo.xcprivacy ios/Runner/PrivacyInfo.xcprivacy
+
+      - run: flutter pub get
+      - run: flutter build ios --release --no-codesign

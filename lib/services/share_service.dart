@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/business_card.dart';
+import 'deep_link_service.dart';
 import 'vcard_service.dart';
 
 /// Handles platform sharing: vCard file, plain-text link, raw payload.
@@ -30,5 +31,13 @@ class ShareService {
     if (card.phone.isNotEmpty) buf.writeln(card.phone);
     if (card.website.isNotEmpty) buf.writeln(card.website);
     await Share.share(buf.toString().trim());
+  }
+
+  static Future<void> shareDeepLink(BusinessCard card) async {
+    final uri = DeepLinkService.encodeCard(card);
+    await Share.share(
+      uri.toString(),
+      subject: card.fullName,
+    );
   }
 }

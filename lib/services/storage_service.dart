@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
@@ -57,4 +58,10 @@ class StorageService {
         'exportedAt': DateTime.now().toIso8601String(),
         'cards': _cards.values.map((c) => c.toJson()).toList(),
       };
+
+  @visibleForTesting
+  void debugInject({Box<BusinessCard>? cards, Box<dynamic>? prefs}) {
+    if (cards != null) _cards = cards;
+    if (prefs != null) _prefs = prefs;
+  }
 }

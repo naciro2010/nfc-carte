@@ -149,7 +149,46 @@ ou de tracking n'est embarqué.
    substantielle → les utilisateurs existants seront re-sollicités.
 4. Adapter `com.votredomaine` à votre Bundle ID réel.
 
-## 6. Déploiement App Store
+## 6. CI/CD et tests automatisés
+
+Pipeline complet (GitHub Actions + Fastlane) documenté dans
+[DEPLOY.md](DEPLOY.md).
+
+- **PR / push** : `ci.yml` — format, `flutter analyze`, tests unitaires +
+  widget, seuil de couverture 60 %, build iOS + Android.
+- **Tag `vX.Y.Z`** :
+  - `release-ios.yml` → Fastlane `beta` → TestFlight
+  - `release-android.yml` → Fastlane `internal` → Play Console Internal
+- **Promotion manuelle** via *Run workflow* (protégée par reviewer
+  requis dans les environnements `ios-production` / `android-production`).
+- **Sécurité** : `security-scan.yml` hebdomadaire (gitleaks +
+  `dart pub outdated --mode=security`).
+
+Tests embarqués :
+
+```bash
+flutter test                 # unit + widget
+flutter test integration_test # full UX flow (consent → create → save)
+```
+
+Arborescence des tests :
+
+```
+test/
+├── helpers/test_harness.dart
+├── models/business_card_test.dart
+├── services/
+│   ├── consent_service_test.dart
+│   ├── deep_link_service_test.dart
+│   └── vcard_service_test.dart
+├── screens/
+│   ├── consent_screen_test.dart
+│   └── home_screen_test.dart
+└── widgets/card_preview_test.dart
+integration_test/app_test.dart
+```
+
+## 7. Déploiement App Store
 
 ```bash
 # 1. Build archive iOS
@@ -172,7 +211,7 @@ Checklist App Store Review :
       (uniquement AES standard fourni par l'OS) → cocher *standard
       encryption exempt*
 
-## 7. Déploiement Play Store
+## 8. Déploiement Play Store
 
 ```bash
 flutter build appbundle --release
@@ -186,7 +225,7 @@ Checklist :
 - [x] Cible API ≥ 34 (vérifier `android/app/build.gradle`)
 - [x] Lien vers la politique de confidentialité publique
 
-## 8. Tests manuels recommandés
+## 9. Tests manuels recommandés
 
 | Scénario                                        | Attendu                           |
 |------------------------------------------------|-----------------------------------|
@@ -198,7 +237,7 @@ Checklist :
 | Paramètres → Supprimer tout                     | Box vidée, retour consentement    |
 | Mode avion + partage vCard                      | Fonctionne (pas de réseau requis) |
 
-## 9. Licence & contributions
+## 10. Licence & contributions
 
 MIT. Le code est volontairement minimal et lisible pour faciliter un audit
 RGPD/sécurité. PRs bienvenues sur la branche

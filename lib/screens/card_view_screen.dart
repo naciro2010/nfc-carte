@@ -190,6 +190,12 @@ class _ShareActions extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
+          onPressed: () => ShareService.shareDeepLink(card),
+          icon: const Icon(Icons.link),
+          label: const Text('Partager un lien'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
           onPressed: () => ShareService.sharePlainText(card),
           icon: const Icon(Icons.ios_share),
           label: const Text('Partager en texte'),

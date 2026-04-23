@@ -47,3 +47,22 @@ lib/l10n/generated/
 *.env
 .env.*
 !.env.example
+
+# Fastlane
+fastlane/**/report.xml
+fastlane/**/Preview.html
+fastlane/**/screenshots
+fastlane/**/test_output
+fastlane/**/README.md.bak
+
+# Ruby / bundler
+vendor/bundle/
+.bundle/
+
+# Keystores (never commit)
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+android/key.properties
